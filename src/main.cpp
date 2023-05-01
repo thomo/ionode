@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 
+#include <Wire.h>
+
 #include <ESP8266WiFi.h>          //ESP8266 Core WiFi Library (you most likely already have this in your sketch)
 
 // #include <DNSServer.h>            //Local DNS Server used for redirecting all requests to the configuration portal
@@ -11,15 +13,11 @@
 #include <LittleFS.h>
 
 #include <ezTime.h>
+
 #include "logger.h"
+#include "Max7300.h"
 
 #define FIRMWARE_VERSION "0.1"
-
-// +++++++++++++++++++
-
-const char COMPILE_INFO[] PROGMEM = {__DATE__ " " __TIME__ " - v" FIRMWARE_VERSION};
-
-// +++++++++++++++++++
 
 #define DEFAULT_NODE_NAME "F42-IONODE"
 #define MQTT_SERVER "mqtt.thomo.de"
@@ -27,8 +25,9 @@ const char COMPILE_INFO[] PROGMEM = {__DATE__ " " __TIME__ " - v" FIRMWARE_VERSI
 
 // +++++++++++++++++++
 
-#define I2C_SDA_PIN  4
-#define I2C_SCL_PIN  5
+const char COMPILE_INFO[] PROGMEM = {__DATE__ " " __TIME__ " - v" FIRMWARE_VERSION};
+
+// +++++++++++++++++++
 
 // const String CONFIG_HTML = "/config.html";
 // const String CONFIG_FILE = "/config.cfg";
@@ -46,6 +45,7 @@ WiFiManager wifiManager;
 
 // WiFiClient espClient;
 
+Max7300 max7300;
 
 // Helper 
 Timezone myTZ;
@@ -97,6 +97,34 @@ void initOTA() {
   ArduinoOTA.begin(false);
 }
 
+void scanI2Cbus() {
+  byte error, address;
+  int nDevices;
+  myLog.info("Scanning...");
+  nDevices = 0;
+  for(address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+    if (error == 0) {
+      myLog.infof("I2C device found at address %#02x", address);
+      nDevices++;
+    }
+    else if (error==4) {
+      myLog.infof("Unknown error at address %#02x", address);
+    }
+  }
+  if (nDevices == 0) {
+    myLog.info("No I2C devices found");
+  }
+  else {
+    myLog.info("done");
+  }
+}
+
+void initMax7300() {
+
+}
+
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 5000);
@@ -106,6 +134,12 @@ void setup() {
   myLog.info("Setup start");
 
   initOTA();
+
+  Wire.begin();
+
+  scanI2Cbus();
+
+  initMax7300();
 
   myLog.info("Setup finished");
 }
